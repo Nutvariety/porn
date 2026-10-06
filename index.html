@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flowchart Magic Adventure: ศึกเวทมนตร์ผจญภัยสัญลักษณ์ผังงาน</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts for Thai -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;700;800&family=Mitr:wght@400;600&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- MediaPipe Hands & Camera Utils -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body {
+            font-family: 'Prompt', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%);
+            min-height: 100vh;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+        .font-mitr { font-family: 'Mitr', sans-serif; }
+        
+        /* High Contrast Mode CSS */
+        body.high-contrast {
+            background: #000000 !important;
+            color: #ffffff !important;
+        }
+        body.high-contrast .card-magic {
+            background: #111111 !important;
+            border: 3px solid #ffff00 !important;
+            box-shadow: none !important;
+        }
+        body.high-contrast button {
+            border: 3px solid #ffffff !important;
+        }
+
+        /* Responsive Large Text Adjustments */
+        body.large-text {
+            font-size: 120%;
+        }
+
+        /* Flowchart Symbol Custom Canvas/Shapes */
+        .symbol-oval {
+            border-radius: 9999px;
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+        .symbol-rect {
+            border-radius: 12px;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        }
+        .symbol-diamond {
+            transform: rotate(45deg);
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border-radius: 8px;
+        }
+        .symbol-diamond-inner {
+            transform: rotate(-45deg);
+        }
+        .symbol-parallelogram {
+            transform: skewX(-20deg);
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+            border-radius: 8px;
+        }
+        .symbol-parallelogram-inner {
+            transform: skewX(20deg);
+        }
+        .symbol-circle {
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ec4899, #be185d);
+        }
+
+        /* Custom Magical Glow & Animations */
+        .glow-effect {
+            box-shadow: 0 0 25px rgba(168, 85, 247, 0.5);
+        }
+        .glow-success {
+            box-shadow: 0 0 25px rgba(16, 185, 129, 0.8);
+        }
+        .floating {
+            animation: floating 3s ease-in-out infinite;
+        }
+        @keyframes floating {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .pulse-slow {
+            animation: pulse 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        /* Hand Pointer Visual Cursor */
+        #virtual-pointer {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            transition: width 0.2s, height 0.2s;
+        }
+        #pointer-timer {
+            transition: stroke-dashoffset 0.1s linear;
+        }
+
+        /* Flowchart Arrow Canvas overlay */
+        #canvas-particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: #8b5cf6; border-radius: 4px; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen justify-between relative selection:bg-purple-500 selection:text-white">
+
+    <canvas id="canvas-particles"></canvas>
+
+    <!-- Hand Pointer Overlay -->
+    <div id="virtual-pointer" class="hidden">
+        <div class="relative flex items-center justify-center">
+            <svg class="w-16 h-16 transform -rotate-90">
+                <circle cx="32" cy="32" r="26" stroke="rgba(255,255,255,0.3)" stroke-width="5" fill="none" />
+                <circle id="pointer-timer" cx="32" cy="32" r="26" stroke="#fbbf24" stroke-width="5" fill="none"
+                        stroke-dasharray="163" stroke-dashoffset="163" stroke-linecap="round" />
+            </svg>
+            <div class="absolute w-8 h-8 bg-amber-400 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-xs text-purple-950 font-bold">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- WebCam Hidden / Preview Box -->
+    <div id="camera-container" class="fixed bottom-4 right-4 z-50 bg-slate-900/90 border-2 border-purple-500 rounded-2xl p-2 shadow-2xl hidden transition-all duration-300 max-w-[200px]">
+        <div class="flex items-center justify-between text-xs text-purple-300 mb-1 px-1 font-bold">
+            <span><i class="fa-solid fa-camera mr-1"></i>กล้องตรวจจับมือ</span>
+            <button onclick="toggleCameraMin()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-minus"></i></button>
+        </div>
+        <div class="relative w-40 h-28 rounded-lg overflow-hidden bg-black flex items-center justify-center">
+            <video id="webcam-video" class="w-full h-full object-cover transform -scale-x-100" playsinline></video>
+            <canvas id="webcam-canvas" class="absolute inset-0 w-full h-full transform -scale-x-100"></canvas>
+            <div id="webcam-status" class="absolute inset-0 bg-slate-950/80 flex flex-col items-center justify-center text-center p-2 text-xs text-amber-300">
+                <i class="fa-solid fa-circle-notch fa-spin text-lg mb-1"></i>
+                <span>กำลังเปิดกล้อง...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Navigation & Accessibility Bar -->
+    <header class="relative z-20 bg-slate-900/80 backdrop-blur-md border-b border-purple-800/40 px-4 py-3">
+        <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <!-- Brand Logo -->
+            <div class="flex items-center gap-3 cursor-pointer" onclick="goHome()">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-amber-400 flex items-center justify-center text-xl text-white shadow-lg shadow-purple-500/30">
+                    <i class="fa-solid fa-diagram-project"></i>
+                </div>
+                <div>
+                    <h1 class="font-mitr text-lg md:text-xl font-bold bg-gradient-to-r from-amber-300 via-pink-300 to-purple-300 bg-clip-text text-transparent">
+                        Flowchart Magic Adventure
+                    </h1>
+                    <p class="text-xs text-purple-300/80 hidden sm:block">ศึกเวทมนตร์ผจญภัยสัญลักษณ์ผังงาน</p>
+                </div>
+            </div>
+
+            <!-- Player Status Dashboard -->
+            <div id="player-dashboard" class="hidden flex items-center gap-3 bg-purple-950/60 border border-purple-700/50 rounded-xl px-4 py-1.5">
+                <div class="flex items-center gap-1.5 text-pink-400 font-bold" title="พลังชีวิต">
+                    <i class="fa-solid fa-heart text-lg text-pink-500 animate-pulse"></i>
+                    <span id="player-hp">3</span>
+                </div>
+                <div class="h-4 w-px bg-purple-700"></div>
+                <div class="flex items-center gap-1.5 text-amber-300 font-bold" title="คะแนน">
+                    <i class="fa-solid fa-star text-amber-400"></i>
+                    <span id="player-score">000</span>
+                </div>
+                <div class="h-4 w-px bg-purple-700"></div>
+                <div class="flex items-center gap-1.5 text-cyan-300 font-bold" title="ชื่อผู้เล่น">
+                    <i class="fa-solid fa-user-wizard text-cyan-400"></i>
+                    <span id="dashboard-name" class="max-w-[100px] truncate">จอมเวท</span>
+                </div>
+            </div>
+
+            <!-- Universal Design Accessibility Controls -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <!-- TTS Voice Toggle -->
+                <button onclick="toggleTTS()" id="btn-tts" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded-xl transition-all" title="เสียงอ่านข้อความ (TTS)">
+                    <i id="icon-tts" class="fa-solid fa-volume-high text-lg"></i>
+                </button>
+                <!-- BGM Toggle -->
+                <button onclick="toggleBGM()" id="btn-bgm" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-purple-400 border border-slate-700 rounded-xl transition-all" title="เพลงประกอบ">
+                    <i id="icon-bgm" class="fa-solid fa-music text-lg"></i>
+                </button>
+                <!-- High Contrast Toggle -->
+                <button onclick="toggleHighContrast()" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-yellow-300 border border-slate-700 rounded-xl transition-all" title="โหมดตัดสีชัดเจน (High Contrast)">
+                    <i class="fa-solid fa-circle-half-stroke text-lg"></i>
+                </button>
+                <!-- Font Size Toggle -->
+                <button onclick="toggleFontSize()" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-xl transition-all font-bold text-sm" title="ปรับขนาดตัวหนังสือ">
+                    A+
+                </button>
+                <!-- Encyclopedia Button -->
+                <button onclick="openEncyclopedia()" class="px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold rounded-xl shadow-lg transition-all flex items-center gap-1.5 text-sm">
+                    <i class="fa-solid fa-book-bookmark"></i>
+                    <span class="hidden md:inline">คลังความรู้</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Dynamic Container -->
+    <main class="relative z-10 max-w-5xl mx-auto w-full px-4 py-6 flex-grow flex flex-col justify-center">
+
+        <!-- VIEW 1: TITLE & CHARACTER CREATION SCREEN -->
+        <section id="view-title" class="space-y-6 text-center max-w-2xl mx-auto my-auto w-full">
+            <div class="floating mb-2">
+                <div class="inline-block p-4 rounded-3xl bg-gradient-to-tr from-purple-600/30 to-amber-500/20 border-2 border-amber-400/50 backdrop-blur-md shadow-2xl">
+                    <div class="flex items-center justify-center gap-3 text-4xl md:text-6xl text-amber-300">
+                        <i class="fa-solid fa-hat-wizard"></i>
+                        <i class="fa-solid fa-diagram-next"></i>
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="font-mitr text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-pink-200 to-cyan-200 mb-2">
+                    Flowchart Magic Adventure
+                </h2>
+                <p class="text-purple-200 text-base md:text-lg">
+                    ศึกเวทมนตร์ผจญภัย เรียนรู้สัญลักษณ์ผังงานสร้างอัลกอริทึม
+                </p>
+            </div>
+
+            <!-- Profile & Setup Card -->
+            <div class="bg-slate-900/80 border-2 border-purple-600/50 rounded-3xl p-6 shadow-2xl backdrop-blur-md space-y-5 text-left">
+                <!-- Name Input -->
+                <div>
+                    <label class="block text-amber-300 font-bold text-base mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-id-card"></i> ชื่อจอมเวทน้อย
+                    </label>
+                    <input type="text" id="input-player-name" value="นักผจญภัยน้อย" placeholder="พิมพ์ชื่อของคุณ..."
+                           class="w-full bg-slate-950 border-2 border-purple-500/60 rounded-2xl px-4 py-3 text-lg text-white focus:outline-none focus:border-amber-400 transition-all font-bold">
+                </div>
+
+                <!-- Avatar Selection -->
+                <div>
+                    <label class="block text-amber-300 font-bold text-base mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-user-ninja"></i> เลือกตัวละคร
+                    </label>
+                    <div class="grid grid-cols-4 gap-3">
+                        <button onclick="selectAvatar('wizard')" class="avatar-btn border-2 border-amber-400 bg-amber-500/20 rounded-2xl p-3 flex flex-col items-center gap-1 hover:scale-105 transition-all text-amber-300">
+                            <i class="fa-solid fa-hat-wizard text-3xl"></i>
+                            <span class="text-xs font-bold">พ่อมด</span>
+                        </button>
+                        <button onclick="selectAvatar('cat')" class="avatar-btn border-2 border-purple-700 bg-purple-950/40 rounded-2xl p-3 flex flex-col items-center gap-1 hover:scale-105 transition-all text-purple-300">
+                            <i class="fa-solid fa-cat text-3xl"></i>
+                            <span class="text-xs font-bold">แมวเวท</span>
+                        </button>
+                        <button onclick="selectAvatar('robot')" class="avatar-btn border-2 border-purple-700 bg-purple-950/40 rounded-2xl p-3 flex flex-col items-center gap-1 hover:scale-105 transition-all text-cyan-300">
+                            <i class="fa-solid fa-robot text-3xl"></i>
+                            <span class="text-xs font-bold">หุ่นยนต์</span>
+                        </button>
+                        <button onclick="selectAvatar('dragon')" class="avatar-btn border-2 border-purple-700 bg-purple-950/40 rounded-2xl p-3 flex flex-col items-center gap-1 hover:scale-105 transition-all text-pink-300">
+                            <i class="fa-solid fa-dragon text-3xl"></i>
+                            <span class="text-xs font-bold">มังกร</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Control Mode Selector -->
+                <div>
+                    <label class="block text-amber-300 font-bold text-base mb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-gamepad"></i> รูปแบบการควบคุม (Multi-modal)
+                    </label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="setControlMode('mouse')" id="mode-btn-mouse" class="border-2 border-amber-400 bg-amber-500/20 rounded-2xl p-3 flex items-center gap-3 text-left hover:border-amber-300 transition-all">
+                            <i class="fa-solid fa-computer-mouse text-2xl text-amber-300"></i>
+                            <div>
+                                <div class="font-bold text-sm text-white">สัมผัส / เมาส์</div>
+                                <div class="text-xs text-slate-300">คลิกหรือแตะหน้าจอ</div>
+                            </div>
+                        </button>
+                        <button onclick="setControlMode('gesture')" id="mode-btn-gesture" class="border-2 border-slate-700 bg-slate-950/50 rounded-2xl p-3 flex items-center gap-3 text-left hover:border-purple-400 transition-all">
+                            <i class="fa-solid fa-hand text-2xl text-purple-400"></i>
+                            <div>
+                                <div class="font-bold text-sm text-white">ตรวจจับการเคลื่อนไหว</div>
+                                <div class="text-xs text-slate-300">เปิดกล้องใช้การขยับมือ</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Start Adventure Button -->
+                <button onclick="startGame()" class="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 hover:from-amber-300 hover:to-pink-400 text-slate-950 font-extrabold text-xl shadow-xl shadow-amber-500/20 transform hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-3">
+                    <span>เริ่มออกผจญภัย</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- VIEW 2: REALM MAP SCREEN (6 LEVELS) -->
+        <section id="view-map" class="hidden space-y-6">
+            <div class="text-center space-y-2">
+                <span class="bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                    แผนที่ดินแดนเวทมนตร์ผังงาน
+                </span>
+                <h2 class="font-mitr text-2xl md:text-4xl font-extrabold text-white">
+                    เลือกดินแดนเพื่อเริ่มภารกิจ
+                </h2>
+                <p class="text-purple-200 text-sm">สะสมดาวเวทมนตร์ให้ครบเพื่อปลดล็อกศึกบอสจอมมาร!</p>
+            </div>
+
+            <!-- Realm Cards Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                
+                <!-- Realm 1: Start / End -->
+                <div onclick="selectLevel(1)" class="realm-card bg-slate-900/90 border-2 border-emerald-500/60 rounded-3xl p-5 hover:border-emerald-400 hover:scale-[1.02] cursor-pointer transition-all shadow-xl relative overflow-hidden group">
+                    <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl group-hover:bg-emerald-500/20 transition-all"></div>
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-lg">1</span>
+                        <div class="symbol-oval px-4 py-1.5 text-xs text-white font-bold shadow-md">Start / End</div>
+                    </div>
+                    <h3 class="font-bold text-lg text-emerald-300 mb-1">🟢 ดินแดนแห่งจุดเริ่มต้นและสิ้นสุด</h3>
+                    <p class="text-xs text-slate-300 mb-4">เรียนรู้สัญลักษณ์ Terminal (Oval) สำหรับเปิด-ปิดการทำงาน</p>
+                    <div class="flex items-center justify-between text-xs font-bold text-slate-400">
+                        <span id="level-1-status" class="text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-unlock"></i> พร้อมปลดล็อก</span>
+                        <div class="flex text-amber-400 gap-0.5 text-sm" id="level-1-stars">
+                            <i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Realm 2: Process -->
+                <div onclick="selectLevel(2)" id="realm-2-card" class="realm-card bg-slate-900/90 border-2 border-blue-500/60 rounded-3xl p-5 hover:border-blue-400 hover:scale-[1.02] cursor-pointer transition-all shadow-xl relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="w-10 h-10 rounded-2xl bg-blue-500/20 text-blue-400 font-bold flex items-center justify-center text-lg">2</span>
+                        <div class="symbol-rect px-4 py-1.5 text-xs text-white font-bold shadow-md">Process</div>
+                    </div>
+                    <h3 class="font-bold text-lg text-blue-300 mb-1">🔵 หุบเขาแห่งการประมวลผล</h3>
+                    <p class="text-xs text-slate-300 mb-4">สัญลักษณ์ สี่เหลี่ยมผืนผ้า (Process) สำหรับคำนวณและปฏิบัติงาน</p>
+                    <div class="flex items-center justify-between text-xs font-bold text-slate-400">
+                        <span id="level-2-status" class="text-blue-400 flex items-center gap-1"><i class="fa-solid fa-play"></i> เริ่มด่าน</span>
+                        <div class="flex text-amber-400 gap-0.5 text-sm" id="level-2-stars">
+                            <i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Realm 3: Decision -->
+                <div onclick="selectLevel(3)" id="realm-3-card" class="realm-card bg-slate-900/90 border-2 border-amber-500/60 rounded-3xl p-5 hover:border-amber-400 hover:scale-[1.02] cursor-pointer transition-all shadow-xl relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center text-lg">3</span>
+                        <div class="symbol-diamond px-3 py-1 text-[10px] text-white font-bold shadow-md"><div class="symbol-diamond-inner">Decision</div></div>
+                    </div>
+                    <h3 class="font-bold text-lg text-amber-300 mb-1">🟡 ถ้ำแห่งการตัดสินใจ</h3>
+                    <p class="text-xs text-slate-300 mb-4">สัญลักษณ์ สี่เหลี่ยมข้าวหลามตัด (Decision) เลือกเงื่อนไข ใช่/ไม่ใช่</p>
+                    <div class="flex items-center justify-between text-xs font-bold text-slate-400">
+                        <span id="level-3-status" class="text-amber-400 flex items-center gap-1"><i class="fa-solid fa-play"></i> เริ่มด่าน</span>
+                        <div class="flex text-amber-400 gap-0.5 text-sm" id="level-3-stars">
+                            <i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Realm 4: Input / Output -->
+                <div onclick="selectLevel(4)" id="realm-4-card" class="realm-card bg-slate-900/90 border-2 border-purple-500/60 rounded-3xl p-5 hover:border-purple-400 hover:scale-[1.02] cursor-pointer transition-all shadow-xl relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 font-bold flex items-center justify-center text-lg">4</span>
+                        <div class="symbol-parallelogram px-4 py-1 text-xs text-white font-bold shadow-md"><div class="symbol-parallelogram-inner">Input/Output</div></div>
+                    </div>
+                    <h3 class="font-bold text-lg text-purple-300 mb-1">🟣 ปราสาทรับข้อมูลและแสดงผล</h3>
+                    <p class="text-xs text-slate-300 mb-4">สัญลักษณ์ สี่เหลี่ยมด้านขนาน (Input/Output) นำเข้าและแสดงข้อมูล</p>
+                    <div class="flex items-center justify-between text-xs font-bold text-slate-400">
+                        <span id="level-4-status" class="text-purple-400 flex items-center gap-1"><i class="fa-solid fa-play"></i> เริ่มด่าน</span>
+                        <div class="flex text-amber-400 gap-0.5 text-sm" id="level-4-stars">
+                            <i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Realm 5: Connector & Arrows -->
+                <div onclick="selectLevel(5)" id="realm-5-card" class="realm-card bg-slate-900/90 border-2 border-pink-500/60 rounded-3xl p-5 hover:border-pink-400 hover:scale-[1.02] cursor-pointer transition-all shadow-xl relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="w-10 h-10 rounded-2xl bg-pink-500/20 text-pink-400 font-bold flex items-center justify-center text-lg">5</span>
+                        <div class="symbol-circle w-8 h-8 flex items-center justify-center text-[10px] text-white font-bold shadow-md">O</div>
+                    </div>
+                    <h3 class="font-bold text-lg text-pink-300 mb-1">🌸 ป่าแห่งจุดเชื่อมต่อและทิศทาง</h3>
+                    <p class="text-xs text-slate-300 mb-4">สัญลักษณ์ ทรงกลม Connector และลูกศรเชื่อมลำดับขั้นตอน</p>
+                    <div class="flex items-center justify-between text-xs font-bold text-slate-400">
+                        <span id="level-5-status" class="text-pink-400 flex items-center gap-1"><i class="fa-solid fa-play"></i> เริ่มด่าน</span>
+                        <div class="flex text-amber-400 gap-0.5 text-sm" id="level-5-stars">
+                            <i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Realm 6: Boss Battle -->
+                <div onclick="selectLevel(6)" id="realm-6-card" class="realm-card bg-slate-900/90 border-2 border-red-500/60 rounded-3xl p-5 hover:border-red-400 hover:scale-[1.02] cursor-pointer transition-all shadow-xl relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="w-10 h-10 rounded-2xl bg-red-500/20 text-red-400 font-bold flex items-center justify-center text-lg"><i class="fa-solid fa-dragon"></i></span>
+                        <span class="bg-red-500 text-white text-xs px-3 py-1 rounded-full font-extrabold uppercase">BOSS</span>
+                    </div>
+                    <h3 class="font-bold text-lg text-red-300 mb-1">🌟 มหาศึกบอสจอมมารผังงาน</h3>
+                    <p class="text-xs text-slate-300 mb-4">ทดสอบรวมมิติจุดเชื่อมสัญลักษณ์เพื่อพิชิตบอสใหญ่ประจำเกม!</p>
+                    <div class="flex items-center justify-between text-xs font-bold text-slate-400">
+                        <span id="level-6-status" class="text-red-400 flex items-center gap-1"><i class="fa-solid fa-lock"></i> ต้องผ่านด่าน 1-5</span>
+                        <div class="flex text-amber-400 gap-0.5 text-sm" id="level-6-stars">
+                            <i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i><i class="fa-regular fa-star"></i>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- VIEW 3: ACTIVE GAMEPLAY CHALLENGE SCREEN -->
+        <section id="view-gameplay" class="hidden space-y-5">
+            <!-- Level Header Bar -->
+            <div class="bg-slate-900/90 border-2 border-purple-600/50 rounded-3xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xl">
+                <div class="flex items-center gap-3">
+                    <button onclick="goMap()" class="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition-all" title="กลับไปแผนที่">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <div>
+                        <h3 id="game-realm-title" class="font-mitr font-bold text-lg md:text-xl text-amber-300">
+                            ด่านที่ 1: ดินแดนแห่งจุดเริ่มต้น
+                        </h3>
+                        <p id="game-quest-subtitle" class="text-xs text-purple-200">ภารกิจที่ 1/3 : เลือกสัญลักษณ์ที่ถูกต้อง</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <button onclick="speakQuestText()" class="px-3 py-1.5 bg-amber-500/20 border border-amber-400/40 text-amber-300 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-amber-500/30">
+                        <i class="fa-solid fa-volume-high text-sm"></i>
+                        <span>ฟังโจทย์</span>
+                    </button>
+                    <button onclick="showHintModal()" class="px-3 py-1.5 bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-cyan-500/30">
+                        <i class="fa-solid fa-lightbulb text-sm"></i>
+                        <span>คำใบ้</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Question & Task Card -->
+            <div class="bg-slate-900/90 border-2 border-purple-500/40 rounded-3xl p-6 shadow-2xl backdrop-blur-md space-y-6">
+                <!-- Task Prompt Box -->
+                <div class="bg-purple-950/50 border border-purple-700/60 rounded-2xl p-4 text-center">
+                    <h4 id="question-text" class="font-mitr text-lg md:text-2xl font-bold text-amber-200 leading-relaxed">
+                        สัญลักษณ์ใดใช้แสดง "จุดเริ่มต้น" (Start) หรือ "จุดสิ้นสุด" (End) ของผังงาน?
+                    </h4>
+                </div>
+
+                <!-- Visual Symbol Playground / Puzzle Area -->
+                <div id="interactive-area" class="min-h-[200px] flex flex-col items-center justify-center rounded-2xl bg-slate-950/60 border-2 border-dashed border-purple-800 p-4 relative">
+                    <!-- Dynamic Game Content Rendered via JS -->
+                </div>
+
+                <!-- Multi-Choice Options Grid -->
+                <div id="options-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Choice cards inserted dynamically -->
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW 4: ENCYCLOPEDIA (คลังความรู้สัญลักษณ์ผังงาน) -->
+        <section id="view-encyclopedia" class="hidden space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="font-mitr text-2xl md:text-3xl font-bold text-amber-300">
+                        📚 สารานุกรมสัญลักษณ์ผังงาน (Flowchart)
+                    </h2>
+                    <p class="text-xs text-purple-200">คู่มือเรียนรู้สัญลักษณ์เวทมนตร์ พร้อมเสียงอ่านอธิบายภาษาไทย</p>
+                </div>
+                <button onclick="goMap()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-sm">
+                    <i class="fa-solid fa-xmark mr-1"></i> ปิด
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Terminal -->
+                <div class="bg-slate-900/90 border-2 border-emerald-500/60 rounded-3xl p-5 space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div class="symbol-oval px-5 py-2 text-white font-bold text-sm shadow-md">Start / End</div>
+                        <div>
+                            <h4 class="font-bold text-emerald-300">จุดเริ่มต้น / จุดสิ้นสุด (Terminal)</h4>
+                            <p class="text-xs text-slate-300">รูปวงรี (Oval)</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-200">ใช้เริ่มต้นและสิ้นสุดการทำงานของโปรแกรมหรืออัลกอริทึมเสมอ</p>
+                    <button onclick="speakText('รูปวงรี Terminal ใช้แสดงจุดเริ่มต้นและจุดสิ้นสุดของผังงาน')" class="text-xs text-amber-300 hover:underline flex items-center gap-1 font-bold">
+                        <i class="fa-solid fa-volume-high"></i> ฟังเสียงอ่าน
+                    </button>
+                </div>
+
+                <!-- Process -->
+                <div class="bg-slate-900/90 border-2 border-blue-500/60 rounded-3xl p-5 space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div class="symbol-rect px-5 py-2 text-white font-bold text-sm shadow-md">Process</div>
+                        <div>
+                            <h4 class="font-bold text-blue-300">การประมวลผล (Process)</h4>
+                            <p class="text-xs text-slate-300">รูปสี่เหลี่ยมผืนผ้า (Rectangle)</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-200">ใช้คำนวณ กำหนดค่า หรือทำกิจกรรมปฏิบัติต่างๆ เช่น การแปรงฟัน การต้มน้ำ</p>
+                    <button onclick="speakText('รูปสี่เหลี่ยมผืนผ้า Process ใช้คำนวณหรือปฏิบัติงานประมวลผล')" class="text-xs text-amber-300 hover:underline flex items-center gap-1 font-bold">
+                        <i class="fa-solid fa-volume-high"></i> ฟังเสียงอ่าน
+                    </button>
+                </div>
+
+                <!-- Decision -->
+                <div class="bg-slate-900/90 border-2 border-amber-500/60 rounded-3xl p-5 space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div class="symbol-diamond px-4 py-1 text-xs text-white font-bold shadow-md"><div class="symbol-diamond-inner">Decision</div></div>
+                        <div>
+                            <h4 class="font-bold text-amber-300">การตัดสินใจ (Decision)</h4>
+                            <p class="text-xs text-slate-300">รูปสี่เหลี่ยมข้าวหลามตัด (Diamond)</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-200">ใช้เปรียบเทียบเงื่อนไข โดยจะมีทางออกอย่างน้อย 2 ทาง คือ ใช่ (True) หรือ ไม่ใช่ (False)</p>
+                    <button onclick="speakText('รูปสี่เหลี่ยมข้าวหลามตัด Decision ใช้ตัดสินใจตามเงื่อนไข ใช่ หรือ ไม่ใช่')" class="text-xs text-amber-300 hover:underline flex items-center gap-1 font-bold">
+                        <i class="fa-solid fa-volume-high"></i> ฟังเสียงอ่าน
+                    </button>
+                </div>
+
+                <!-- Input / Output -->
+                <div class="bg-slate-900/90 border-2 border-purple-500/60 rounded-3xl p-5 space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div class="symbol-parallelogram px-4 py-1 text-xs text-white font-bold shadow-md"><div class="symbol-parallelogram-inner">Input / Output</div></div>
+                        <div>
+                            <h4 class="font-bold text-purple-300">รับข้อมูล / แสดงผล (Input/Output)</h4>
+                            <p class="text-xs text-slate-300">รูปสี่เหลี่ยมด้านขนาน (Parallelogram)</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-200">ใช้รับค่าข้อมูลเข้าสู่โปรแกรม หรือแสดงผลข้อมูลทั่วไปโดยไม่ระบุอุปกรณ์</p>
+                    <button onclick="speakText('รูปสี่เหลี่ยมด้านขนาน Input Output ใช้รับและแสดงผลข้อมูลทั่วไป')" class="text-xs text-amber-300 hover:underline flex items-center gap-1 font-bold">
+                        <i class="fa-solid fa-volume-high"></i> ฟังเสียงอ่าน
+                    </button>
+                </div>
+
+                <!-- Connector -->
+                <div class="bg-slate-900/90 border-2 border-pink-500/60 rounded-3xl p-5 space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div class="symbol-circle w-10 h-10 flex items-center justify-center text-white font-bold shadow-md">O</div>
+                        <div>
+                            <h4 class="font-bold text-pink-300">จุดเชื่อมต่อ (Connector)</h4>
+                            <p class="text-xs text-slate-300">รูปวงกลม (Circle)</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-200">ใช้รวมเส้นทาง หรือเชื่อมต่อจุดการทำงานผังงานในหน้าเดียวกัน</p>
+                    <button onclick="speakText('รูปวงกลม Connector ใช้เป็นจุดเชื่อมต่อเส้นทางการทำงานผังงาน')" class="text-xs text-amber-300 hover:underline flex items-center gap-1 font-bold">
+                        <i class="fa-solid fa-volume-high"></i> ฟังเสียงอ่าน
+                    </button>
+                </div>
+
+                <!-- Flowline -->
+                <div class="bg-slate-900/90 border-2 border-cyan-500/60 rounded-3xl p-5 space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div class="text-cyan-400 text-3xl font-extrabold px-3">➔</div>
+                        <div>
+                            <h4 class="font-bold text-cyan-300">ทิศทางการทำงาน (Flowline)</h4>
+                            <p class="text-xs text-slate-300">เส้นลูกศร (Arrow)</p>
+                        </div>
+                    </div>
+                    <p class="text-sm text-slate-200">ใช้ระบุลำดับทิศทางการไหลของการทำงานจากขั้นตอนหนึ่งไปอีกขั้นตอนหนึ่ง</p>
+                    <button onclick="speakText('เส้นลูกศร Flowline แสดงทิศทางการทำงานของผังงาน')" class="text-xs text-amber-300 hover:underline flex items-center gap-1 font-bold">
+                        <i class="fa-solid fa-volume-high"></i> ฟังเสียงอ่าน
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Positive Reinforcement Modal / Popup -->
+    <div id="modal-feedback" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border-2 border-purple-500 rounded-3xl max-w-md w-full p-6 text-center space-y-5 shadow-2xl animate-bounce-short">
+            <div id="modal-icon" class="text-6xl text-amber-400">
+                🎉
+            </div>
+            <div>
+                <h3 id="modal-title" class="font-mitr text-2xl font-bold text-white mb-2">
+                    เก่งมากเลย!
+                </h3>
+                <p id="modal-desc" class="text-purple-200 text-sm">
+                    คุณตอบถูกต้องแล้ว รับพลังเวทมนตร์เพิ่ม 10 คะแนน
+                </p>
+            </div>
+            <div id="modal-fact" class="hidden bg-purple-950/60 border border-purple-700/50 rounded-2xl p-3 text-xs text-amber-200 text-left">
+                <strong>💡 รู้หรือไม่?</strong> <span id="modal-fact-text">สัญลักษณ์รูปวงรีต้องมีทั้งจุดเริ่มต้นและจุดจบเสมอ</span>
+            </div>
+            <button onclick="nextQuest()" id="btn-next-quest" class="w-full py-3 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-bold rounded-2xl text-lg shadow-lg">
+                ไปภารกิจต่อไป →
+            </button>
+        </div>
+    </div>
+
+    <!-- Hint Modal Popup -->
+    <div id="modal-hint" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border-2 border-cyan-500 rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl">
+            <div class="w-14 h-14 rounded-2xl bg-cyan-500/20 text-cyan-400 text-3xl font-bold flex items-center justify-center mx-auto">
+                <i class="fa-solid fa-lightbulb"></i>
+            </div>
+            <h3 class="font-mitr text-xl font-bold text-cyan-300">คำใบ้เวทมนตร์</h3>
+            <p id="hint-text" class="text-slate-200 text-sm leading-relaxed">
+                ลองสังเกตดูรูปทรงที่มีมุมมน วงรีมักใช้กับการเปิดปิดโปรแกรมนะ!
+            </p>
+            <button onclick="closeHintModal()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/50 font-bold rounded-xl text-sm">
+                เข้าในแล้ว!
+            </button>
+        </div>
+    </div>
+
+    <!-- Footer Accessibility Footer -->
+    <footer class="relative z-20 bg-slate-900/90 border-t border-purple-900/40 py-3 text-center text-xs text-purple-300/70">
+        <div class="max-w-6xl mx-auto px-4 flex flex-wrap items-center justify-between gap-2">
+            <span>✨ ออกแบบตามหลัก Universal Design (UDL) สำหรับนักเรียนทุกคน</span>
+            <span>โรงเรียนออทิสติกสุพรรณบุรี & ศรีสังวาลย์เชียงใหม่ 💖</span>
+        </div>
+    </footer>
+
+    <script>
+        const gameState = {
+            playerName: 'นักผจญภัยน้อย',
+            avatar: 'wizard',
+            controlMode: 'mouse', // 'mouse' or 'gesture'
+            hp: 3,
+            score: 0,
+            currentLevel: 1,
+            currentQuestIndex: 0,
+            stars: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+            ttsEnabled: true,
+            bgmEnabled: false,
+            highContrast: false,
+            largeText: false,
+            activeQuestList: []
+        };
+
+        // Web Audio Synthesizer Context
+        let audioCtx = null;
+        let bgmOscillator = null;
+        let bgmGain = null;
+        let bgmInterval = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Web Audio Sound Generators (Zero External Audio File Dependency)
+        function playSound(type) {
+            initAudio();
+            if (!audioCtx) return;
+
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            } else if (type === 'success') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.setValueAtTime(554.37, now + 0.1);
+                osc.frequency.setValueAtTime(659.25, now + 0.2);
+                osc.frequency.setValueAtTime(880, now + 0.3);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else if (type === 'wrong') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(200, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            } else if (type === 'fanfare') {
+                const notes = [523.
